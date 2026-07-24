@@ -8,6 +8,7 @@ overall and (b) a short paragraph for one specific applicant.
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
@@ -15,6 +16,7 @@ import shap
 from model import TrainedModel, train_baseline_model
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+FIGURES_DIR = PROJECT_ROOT / "outputs" / "figures"
 
 # Human-readable feature descriptions, used to phrase local explanations.
 FEATURE_DESCRIPTIONS = {
@@ -162,6 +164,34 @@ def pick_declined_applicant(trained: TrainedModel, proba: np.ndarray) -> int:
     return int(np.argmax(proba))
 
 
+def plot_global_importance(ranking: pd.DataFrame, top_n: int = 10, save_path: Path | None = None):
+    """Horizontal bar chart of mean |SHAP| per feature, styled to match the cost curve."""
+    top = ranking.head(top_n).iloc[::-1]  # reverse so the top feature ends up at the top of the barh
+
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+    ax.set_facecolor("#fcfcfb")
+    fig.patch.set_facecolor("#fcfcfb")
+
+    ax.barh(top["feature"], top["mean_abs_shap"], color="#2a78d6")
+
+    ax.set_xlabel("Mean |SHAP value| (impact on predicted default risk)", color="#52514e")
+    ax.set_title("What drives predicted default risk?", color="#0b0b0b", fontsize=13)
+    ax.tick_params(colors="#898781")
+    ax.tick_params(axis="y", colors="#0b0b0b")
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color("#c3c2b7")
+    ax.grid(alpha=0.3, color="#e1e0d9", axis="x")
+    fig.tight_layout()
+
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, facecolor=fig.get_facecolor())
+        print(f"Saved SHAP importance chart to {save_path}")
+    return fig
+
+
 if __name__ == "__main__":
     trained = train_baseline_model()
     proba = trained.model.predict_proba(trained.X_test)[:, 1]
@@ -172,6 +202,7 @@ if __name__ == "__main__":
     print("\nTop 3 drivers overall:")
     for _, row in ranking.head(3).iterrows():
         print(f"  - {row['feature']}: mean |SHAP| = {row['mean_abs_shap']:.4f}")
+    plot_global_importance(ranking, save_path=FIGURES_DIR / "shap_importance.png")
 
     print("\n=== Local explanation: one declined applicant ===")
     idx = pick_declined_applicant(trained, proba)

@@ -63,6 +63,8 @@ known structure rather than being random noise:
    data-cleaning judgment, not just a `.fillna()` call. Imputation for other
    missing values is fit on the training split only -- fitting on the full
    dataset first would leak test-set distribution into training.
+
+   ![Left: bar chart showing 1,072 of 5,500 applicants carry the DAYS_EMPLOYED sentinel value before cleaning. Right: histogram of the legitimate YEARS_EMPLOYED distribution after the sentinel is flagged and nulled out.](outputs/figures/days_employed_anomaly.png)
 2. **Use a model that's good enough, not maximal.** A `RandomForestClassifier`
    with `class_weight="balanced"` (defaults are a small minority of
    applicants, so an unweighted model just learns to predict "no default" for
@@ -109,6 +111,9 @@ On the bundled synthetic sample, with a fixed random seed throughout:
   `EXT_SOURCE_3`, `EXT_SOURCE_1` -- the three external bureau scores, which
   is exactly what the synthetic data was constructed to reward, and mirrors
   what's reported for the real dataset.
+
+  ![Horizontal bar chart of mean absolute SHAP value per feature, ranked. The three external bureau scores (EXT_SOURCE_2, EXT_SOURCE_3, EXT_SOURCE_1) dominate, followed by debt-to-income.](outputs/figures/shap_importance.png)
+
 - **Local explanation**, one declined applicant (from the notebook): *"Applicant
   103791 was predicted to have a 75% chance of default and would be declined
   under this model. Factors that pushed their risk score up: a second
@@ -151,10 +156,10 @@ pip install -r requirements.txt
 ### With the bundled synthetic sample (default, no setup)
 
 ```bash
-python src/data_prep.py      # (re)generates data/sample.csv
+python src/data_prep.py      # (re)generates data/sample.csv, saves outputs/figures/days_employed_anomaly.png
 python src/model.py          # trains the baseline model, prints AUC + classification report
 python src/cost_analysis.py  # runs the threshold sweep, prints $ results, saves outputs/figures/cost_curve.png
-python src/explain.py        # prints global SHAP ranking + one local explanation
+python src/explain.py        # prints global SHAP ranking + local explanation, saves outputs/figures/shap_importance.png
 ```
 
 Or open `notebooks/analysis.ipynb` for the narrated version with everything
@@ -188,5 +193,7 @@ credit-risk-threshold-optimizer/
 ├── notebooks/
 │   └── analysis.ipynb        # narrated, fully-executed walkthrough
 └── outputs/figures/
-    └── cost_curve.png
+    ├── cost_curve.png            # the centerpiece: $ cost vs. threshold
+    ├── days_employed_anomaly.png # the DAYS_EMPLOYED sentinel, before/after cleaning
+    └── shap_importance.png       # global SHAP feature ranking
 ```

@@ -7,12 +7,14 @@ logic) so every step can be unit-tested or re-run from the CLI.
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RAW_PATH = PROJECT_ROOT / "data" / "raw" / "application_train.csv"
 SAMPLE_PATH = PROJECT_ROOT / "data" / "sample.csv"
+FIGURES_DIR = PROJECT_ROOT / "outputs" / "figures"
 
 RANDOM_SEED = 42
 
@@ -213,6 +215,57 @@ def build_sample_csv(n_rows: int = 5500, seed: int = RANDOM_SEED) -> Path:
     return SAMPLE_PATH
 
 
+def plot_days_employed_anomaly(raw_df: pd.DataFrame, cleaned_df: pd.DataFrame, save_path: Path | None = None):
+    """Two panels: how common the DAYS_EMPLOYED sentinel is before cleaning,
+    and the legitimate YEARS_EMPLOYED distribution once it's removed.
+
+    A single histogram of the raw column would be useless -- the sentinel
+    (365243 days, ~1000 years) sits so far from real values that a linear
+    axis squashes the real distribution into one bar. Splitting into "how
+    many rows are affected" + "what the real distribution looks like" tells
+    the actual story instead.
+    """
+    is_sentinel = raw_df["DAYS_EMPLOYED"] == DAYS_EMPLOYED_SENTINEL
+    sentinel_count = int(is_sentinel.sum())
+    real_count = int((~is_sentinel).sum())
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
+    for ax in (ax1, ax2):
+        ax.set_facecolor("#fcfcfb")
+    fig.patch.set_facecolor("#fcfcfb")
+
+    bars = ax1.bar(
+        ["Real day count", "Sentinel (365,243 days\n= ~1000 years)"],
+        [real_count, sentinel_count],
+        color=["#2a78d6", "#eb6834"],
+    )
+    ax1.bar_label(bars, fmt="{:,.0f}", color="#0b0b0b", padding=3)
+    ax1.set_ylabel("Number of applicants", color="#52514e")
+    ax1.set_title("DAYS_EMPLOYED, before cleaning", color="#0b0b0b", fontsize=12)
+
+    years_employed = cleaned_df["YEARS_EMPLOYED"].dropna()
+    ax2.hist(years_employed, bins=30, color="#2a78d6")
+    ax2.set_xlabel("Years employed", color="#52514e")
+    ax2.set_ylabel("Number of applicants", color="#52514e")
+    ax2.set_title("YEARS_EMPLOYED, after flagging + nulling the sentinel", color="#0b0b0b", fontsize=12)
+
+    for ax in (ax1, ax2):
+        ax.tick_params(colors="#898781")
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        for spine in ("left", "bottom"):
+            ax.spines[spine].set_color("#c3c2b7")
+        ax.grid(alpha=0.3, color="#e1e0d9", axis="y")
+
+    fig.tight_layout()
+
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(save_path, dpi=150, facecolor=fig.get_facecolor())
+        print(f"Saved DAYS_EMPLOYED anomaly chart to {save_path}")
+    return fig
+
+
 if __name__ == "__main__":
     path = build_sample_csv()
     df = pd.read_csv(path)
@@ -224,3 +277,5 @@ if __name__ == "__main__":
     cleaned = clean_and_engineer(df)
     print("\nAfter cleaning:")
     print(cleaned[["FLAG_EMPLOYED_ANOMALY", "AGE_YEARS", "YEARS_EMPLOYED", "DEBT_TO_INCOME"]].describe())
+
+    plot_days_employed_anomaly(df, cleaned, save_path=FIGURES_DIR / "days_employed_anomaly.png")
