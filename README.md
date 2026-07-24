@@ -167,13 +167,78 @@ already executed and baked in.
 
 ### With the real Kaggle data (opt-in upgrade)
 
-1. Create a free [Kaggle](https://www.kaggle.com) account and accept the
-   competition rules for [Home Credit Default Risk](https://www.kaggle.com/c/home-credit-default-risk).
-2. Download `application_train.csv` and place it at
-   `data/raw/application_train.csv` (gitignored -- it's never committed).
-3. Re-run any script above, or the notebook, unchanged. `load_raw_data()` in
-   `src/data_prep.py` prefers the real file whenever it's present and prints
-   which source it used.
+The synthetic sample is the default so nothing below is required to run this
+project -- but if you want the real ~300k-row dataset instead of the
+synthetic stand-in, here's the full path, either through the browser or the
+Kaggle CLI.
+
+**1. Create a Kaggle account (skip if you have one).**
+Sign up free at [kaggle.com](https://www.kaggle.com/account/login).
+
+**2. Accept the competition's rules.**
+Go to the [Home Credit Default Risk competition page](https://www.kaggle.com/c/home-credit-default-risk),
+click **Join Competition** / **Late Submission**, and accept the terms. This
+step is required -- Kaggle blocks the download otherwise, even with a valid
+account.
+
+**3. Get the file, using either option:**
+
+- **Option A -- browser (no setup, larger click-through):**
+  1. On the competition page, open the **Data** tab.
+  2. Scroll to the file list and download `application_train.csv` directly
+     (it's the largest file at ~160MB; you don't need the other files in
+     the zip -- `bureau.csv`, `previous_application.csv`, etc. -- this
+     project only reads the one table).
+  3. If Kaggle gives you a `.zip`, unzip it so you're left with the plain
+     `application_train.csv`.
+
+- **Option B -- Kaggle CLI (faster if you're doing this more than once):**
+  1. Install the CLI into your project's virtual environment:
+     ```bash
+     pip install kaggle
+     ```
+  2. Get an API token: on Kaggle, go to
+     **Account Settings** (click your profile picture -> Settings) ->
+     scroll to the **API** section -> **Create New Token**. This downloads
+     a `kaggle.json` file containing your username and key.
+  3. Place that file where the CLI expects it, and lock down its
+     permissions (it's a credential):
+     ```bash
+     mkdir -p ~/.kaggle
+     mv ~/Downloads/kaggle.json ~/.kaggle/kaggle.json
+     chmod 600 ~/.kaggle/kaggle.json
+     ```
+  4. Download and unzip straight into place from the project root:
+     ```bash
+     kaggle competitions download -c home-credit-default-risk -f application_train.csv -p data/raw/
+     unzip data/raw/application_train.csv.zip -d data/raw/
+     rm data/raw/application_train.csv.zip
+     ```
+
+**4. Confirm it landed in the right spot.**
+The file must be at exactly `data/raw/application_train.csv` (this path is
+gitignored, so it's never accidentally committed):
+```bash
+ls -lh data/raw/application_train.csv
+```
+
+**5. Re-run anything -- no code changes needed.**
+```bash
+python src/data_prep.py
+```
+`load_raw_data()` in `src/data_prep.py` checks for that exact path first and
+prints which source it used. You should now see:
+```
+[data_prep] Loading real data from /.../data/raw/application_train.csv
+```
+instead of the "Real data not found... using synthetic sample" message. Every
+other script (`model.py`, `cost_analysis.py`, `explain.py`) and the notebook
+pick this up automatically the same way -- nothing else to configure.
+
+**Note:** the real file only needs the columns this project actually reads
+(`SK_ID_CURR`, `TARGET`, `EXT_SOURCE_1/2/3`, etc. -- the full list is
+`COLUMNS` in `src/data_prep.py`); the other ~100+ columns in the real file
+are simply ignored on load, not an error.
 
 ## Repo layout
 
