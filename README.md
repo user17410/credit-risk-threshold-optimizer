@@ -144,6 +144,58 @@ the only way to know is to check, not assume.
   `PRD.md`); a gradient-boosted model or richer joined feature set would very
   likely score higher.
 
+### Validated against the real Kaggle dataset
+
+Everything above is the synthetic-sample run, which is what this repo
+reproduces by default. The pipeline was also run, once, against the real
+`application_train.csv` (307,511 rows) to confirm it actually works end to
+end on the real thing and isn't just tuned to its own synthetic stand-in.
+That real file isn't committed (see "How to reproduce" below for why), so
+these numbers are reported as one-time validation evidence rather than
+something a fresh clone reproduces automatically -- re-download the real
+data yourself if you want to regenerate them.
+
+- **Baseline model:** ROC AUC = **0.739** -- within 0.004 of the synthetic
+  run's 0.743, which is a reasonable sign the synthetic data wasn't
+  accidentally miscalibrated relative to the real thing.
+- **Optimal threshold: 0.63**, clearly apart from the naive 0.5 cutoff this
+  time -- and unlike the synthetic run, this isn't a subtle effect:
+
+  ![Cost curve on the real 307,511-row dataset: the naive 0.5 threshold sits well up the descending slope, far from the true minimum at 0.63, and even costs more than approving every applicant.](outputs/figures/cost_curve_real_data.png)
+
+  - Total cost at the optimal threshold: **$1,849,876,999**
+  - Total cost at the naive 0.5 threshold: **$2,192,470,526**
+  - Total cost approving every applicant: **$2,080,401,335**
+  - **Savings vs. naive 0.5: ~$343M. Savings vs. approving everyone: ~$231M.**
+  - Worth sitting with: at the naive 0.5 cutoff, total cost is *higher* than
+    just approving every single applicant. On this run, defaulting to 0.5
+    wouldn't just be a suboptimal decision -- it would actively lose more
+    money than doing nothing. That's the entire argument of this project in
+    one number, and it only showed up on the real data, not the synthetic
+    sample -- which is itself the reason the synthetic run's README
+    disclaimer above ("the only way to know is to check, not assume") is
+    there rather than a stronger claim.
+- **Global SHAP ranking**, top 3: `EXT_SOURCE_3`, `EXT_SOURCE_2`,
+  `EXT_SOURCE_1` (same three features as the synthetic run, reordered) --
+  consistent with what's widely reported for this dataset elsewhere.
+- **Bug found and fixed during this validation run:** the local explanation's
+  phrasing for one-hot categorical features didn't check whether the
+  applicant's actual value was 1 or 0 before saying "a family status of X" --
+  on real data this surfaced as one applicant's narrative claiming both
+  "Married" *and* "Single / not married" in the same sentence, which is
+  impossible. Fixed in `explain.py` (`_describe_feature`) to phrase a 0-value
+  dummy as "not having a family status of X" instead. This is exactly the
+  kind of bug that stays invisible on a small, low-cardinality synthetic
+  sample and only shows up once you run against messier real-world data.
+
+  ![Global SHAP feature importance on the real dataset -- same top-3 external bureau scores as the synthetic run, confirming the synthetic data's signal structure matches the real thing.](outputs/figures/shap_importance_real_data.png)
+
+Cost totals here are two orders of magnitude larger than the synthetic run's
+purely because the real test set has ~56x more rows -- that scale difference
+is not itself meaningful. What's meaningful is the *shape*: a materially
+different optimal threshold, and a naive 0.5 cutoff that's demonstrably
+worse than the do-nothing baseline.
+
 ## How to reproduce
 
 ```bash
@@ -214,6 +266,17 @@ account.
      unzip data/raw/application_train.csv.zip -d data/raw/
      rm data/raw/application_train.csv.zip
      ```
+     **If that 403s** (this happened during testing, even with rules
+     accepted and a valid token -- the single-file endpoint seems flaky):
+     fall back to downloading the whole competition archive and pulling out
+     just the one file you need:
+     ```bash
+     kaggle competitions download -c home-credit-default-risk -p data/raw/
+     unzip data/raw/home-credit-default-risk.zip application_train.csv -d data/raw/
+     rm data/raw/home-credit-default-risk.zip
+     ```
+     This one's ~690MB zipped (vs. ~160MB for the single file) and takes a
+     few minutes, but it's the reliable path if the targeted download fails.
 
 **4. Confirm it landed in the right spot.**
 The file must be at exactly `data/raw/application_train.csv` (this path is
@@ -258,7 +321,9 @@ credit-risk-threshold-optimizer/
 ├── notebooks/
 │   └── analysis.ipynb        # narrated, fully-executed walkthrough
 └── outputs/figures/
-    ├── cost_curve.png            # the centerpiece: $ cost vs. threshold
-    ├── days_employed_anomaly.png # the DAYS_EMPLOYED sentinel, before/after cleaning
-    └── shap_importance.png       # global SHAP feature ranking
+    ├── cost_curve.png                 # the centerpiece: $ cost vs. threshold (synthetic sample)
+    ├── days_employed_anomaly.png      # the DAYS_EMPLOYED sentinel, before/after cleaning
+    ├── shap_importance.png            # global SHAP feature ranking (synthetic sample)
+    ├── cost_curve_real_data.png       # same cost curve, one-time validation run on real Kaggle data
+    └── shap_importance_real_data.png  # same SHAP ranking, real Kaggle data
 ```

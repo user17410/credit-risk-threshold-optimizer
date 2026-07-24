@@ -133,6 +133,14 @@ def _describe_feature(feature: str, value: float | None = None, median: float | 
     for prefix, label in CATEGORICAL_LABELS.items():
         if feature.startswith(prefix + "_"):
             cat_value = feature[len(prefix) + 1:]
+            # One-hot columns are 0/1: a SHAP value on a 0 (i.e. "does NOT
+            # belong to this category") is a real, valid contribution, but
+            # phrasing it as "a family status of X" would misreport the
+            # applicant as belonging to X when they don't -- and since only
+            # one dummy per group is ever 1, two "belongs to X" phrases in
+            # the same narrative would describe an impossible applicant.
+            if value is not None and value < 0.5:
+                return f"not having a {label} of \"{cat_value}\""
             return f"a {label} of \"{cat_value}\""
     return feature.replace("_", " ").lower()
 
