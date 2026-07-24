@@ -136,14 +136,14 @@ def generate_synthetic_sample(n_rows: int = 5500, seed: int = RANDOM_SEED) -> pd
     # and noise, so the model has genuine signal to recover.
     debt_to_income = credit_amt / income_total
     risk_score = (
-        -3.1 * ext_source_1
-        - 2.6 * ext_source_2
-        - 2.3 * ext_source_3
+        -4.2 * ext_source_1
+        - 3.6 * ext_source_2
+        - 3.2 * ext_source_3
         + 0.35 * (debt_to_income - debt_to_income.mean()) / debt_to_income.std()
-        + rng.normal(0, 0.9, size=n_rows)
+        + rng.normal(0, 0.75, size=n_rows)
     )
     # Calibrate intercept so the base default rate lands at ~8.5%.
-    target_prob = 1 / (1 + np.exp(-(risk_score + 2.05)))
+    target_prob = 1 / (1 + np.exp(-(risk_score + 3.85)))
     target = (rng.random(n_rows) < target_prob).astype(int)
 
     df = pd.DataFrame(
