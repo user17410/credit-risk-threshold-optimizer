@@ -145,15 +145,24 @@ def _describe_feature(feature: str, value: float | None = None, median: float | 
     return feature.replace("_", " ").lower()
 
 
+def _article_for_percent(pct: int) -> str:
+    """"a 12% chance" reads fine, but "a 82% chance" doesn't: pick the article by
+    how the number is actually pronounced (eight, eighty, eleven, eighteen)."""
+    if pct == 8 or pct == 11 or pct == 18 or 80 <= pct <= 89:
+        return "an"
+    return "a"
+
+
 def _build_narrative(sk_id, proba: float, up: pd.DataFrame, down: pd.DataFrame, medians: pd.Series) -> str:
     decision = "declined" if proba > 0.5 else "approved"
+    pct = round(proba * 100)
 
     up_phrases = [_describe_feature(row.feature, row.value, medians[row.feature]) for row in up.itertuples()]
     down_phrases = [_describe_feature(row.feature, row.value, medians[row.feature]) for row in down.itertuples()]
 
     sentences = [
-        f"Applicant {sk_id} was predicted to have a {proba:.0%} chance of default and would be {decision} "
-        f"under this model."
+        f"Applicant {sk_id} was predicted to have {_article_for_percent(pct)} {pct}% chance of default and "
+        f"would be {decision} under this model."
     ]
     if up_phrases:
         sentences.append(
